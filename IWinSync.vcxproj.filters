@@ -65,10 +65,10 @@
     <Image Include="res\IWinSync.ico">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="res\bitmap1.bmp">
+    <Image Include="res\IWinSync.png">
       <Filter>Resource Files</Filter>
     </Image>
-    <Image Include="res\IWinSync.png">
+    <Image Include="res\IWinSync.bmp">
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>

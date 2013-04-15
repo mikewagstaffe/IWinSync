@@ -393,6 +393,7 @@ void CIWinSyncDlg::OnTraymenuSyncCenter()
 void CIWinSyncDlg::OnTraymenuAbout()  
 {
 	CAboutBox Aboutdlg;
+	_stprintf_s(Aboutdlg.m_szVersion,_T("%s"),VERSIONTEXT );
 	Aboutdlg.DoModal();
 }
 

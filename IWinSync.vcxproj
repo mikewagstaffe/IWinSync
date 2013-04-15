@@ -124,7 +124,7 @@
     <None Include="res\IWinSync.rc2" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="res\bitmap1.bmp" />
+    <Image Include="res\IWinSync.bmp" />
     <Image Include="res\IWinSync.ico" />
     <Image Include="res\IWinSync.png" />
   </ItemGroup>

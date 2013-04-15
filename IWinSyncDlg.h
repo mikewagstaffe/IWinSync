@@ -3,6 +3,7 @@
 //
 
 #pragma once
+#define VERSIONTEXT _T("1.0.2")
 
 #define WM_TRAY_ICON_NOTIFY_MESSAGE (WM_USER + 1)
 

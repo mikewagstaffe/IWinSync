@@ -32,3 +32,11 @@ END_MESSAGE_MAP()
 
 
 // CAboutBox message handlers
+
+
+BOOL CAboutBox::OnInitDialog()
+{
+	CDialogEx::OnInitDialog();
+	GetDlgItem(IDC_VERSIONTEXT)->SetWindowText(m_szVersion);
+	return (TRUE);
+}
