@@ -102,6 +102,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AboutBox.h" />
+    <ClInclude Include="FlyoutDlg.h" />
     <ClInclude Include="IWinSync.h" />
     <ClInclude Include="IWinSyncDlg.h" />
     <ClInclude Include="Resource.h" />
@@ -110,6 +111,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AboutBox.cpp" />
+    <ClCompile Include="FlyoutDlg.cpp" />
     <ClCompile Include="IWinSync.cpp" />
     <ClCompile Include="IWinSyncDlg.cpp" />
     <ClCompile Include="stdafx.cpp">
