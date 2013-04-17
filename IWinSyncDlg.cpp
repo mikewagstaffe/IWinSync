@@ -15,8 +15,6 @@
 
 // CIWinSyncDlg dialog
 
-
-
 CIWinSyncDlg::CIWinSyncDlg(CWnd* pParent /*=NULL*/) : CDialogEx(CIWinSyncDlg::IDD, pParent)
 {
 	//End Of Tray Icon Init Code
@@ -120,13 +118,13 @@ void CIWinSyncDlg::OnDestroy()
 			free(m_apszLastResults[i]);
 		}
 	}
-	
-	CDialog::OnDestroy();
 	if (m_pFlyoutDialog != NULL)
 	{
 		m_pFlyoutDialog->DestroyWindow();
 		m_pFlyoutDialog = NULL;
 	}
+	CDialog::OnDestroy();
+	
 }
 
 void CIWinSyncDlg::OnSysCommand(UINT nID, LPARAM lParam)
@@ -425,8 +423,6 @@ void CIWinSyncDlg::SetupLogging()
 void CIWinSyncDlg::ReadRegistrySettings()
 {
 	m_pszCurrentSyncPath = NULL;
-	m_pszLogPath = NULL;
-
 	m_apszLastResults[0] = NULL;
 	m_apszLastResults[1] = NULL;
 	m_apszLastResults[2] = NULL;
