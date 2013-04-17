@@ -33,6 +33,7 @@ BEGIN_MESSAGE_MAP(CIWinSyncDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_WM_CREATE() //On Create Of The Dialog
 	ON_WM_DESTROY() //On destroy Of the Dialog
+	ON_WM_ACTIVATE()
 	ON_MESSAGE(WMAPP_NOTIFYCALLBACK,OnTrayNotify)
 	ON_WM_SYSCOMMAND() //Hook The Minimize request
 	ON_COMMAND(ID_TRAYMENU_STATUS, OnTraymenuStatus)
@@ -41,6 +42,9 @@ BEGIN_MESSAGE_MAP(CIWinSyncDlg, CDialogEx)
 	ON_COMMAND(ID_TRAYMENU_EXIT, OnTraymenuExit)
 	ON_WM_TIMER()
 	ON_MESSAGE(WMAPP_HIDEFLYOUT, OnWmappHideflyout)
+	ON_BN_CLICKED(IDC_MINIMISE, &CIWinSyncDlg::OnBnClickedMinimise)
+	ON_BN_CLICKED(IDC_REVIEWCONFLICT, &CIWinSyncDlg::OnBnClickedReviewconflict)
+	ON_BN_CLICKED(IDC_REVIEWLOG, &CIWinSyncDlg::OnBnClickedReviewlog)
 END_MESSAGE_MAP()
 
 
@@ -54,7 +58,25 @@ BOOL CIWinSyncDlg::OnInitDialog()
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);			// Set big icon
 	SetIcon(m_hIcon, FALSE);		// Set small icon
+	
+	m_bLoggingEnabled = FALSE; // We have not obtained log details yet
+	SetupLogging();
 
+	//Populate the Debug Level Listbox
+	CListBox* pDebugLevelList = NULL;
+	pDebugLevelList = (CListBox*) GetDlgItem(IDC_LIST_LOGLEVEL);
+	if (pDebugLevelList != NULL)
+	{
+		pDebugLevelList->AddString(LOGLEVEL_LISTBOX_DEBUG);
+		pDebugLevelList->AddString(LOGLEVEL_LISTBOX_WARN);
+		pDebugLevelList->AddString(LOGLEVEL_LISTBOX_ERROR);
+	}
+	//Load Application Settings from the registry
+	ReadRegistrySettings();
+	m_bSuppressDialogs = FALSE;
+	m_bDisableSync = FALSE;
+	PopulateSettingsDialog();
+	
 	ShowWindow(SW_SHOWMINIMIZED);
 	m_bMinimizeToTray = FALSE;
 	m_bCanShowFlyout = TRUE;
@@ -83,8 +105,28 @@ int CIWinSyncDlg::OnCreate(LPCREATESTRUCT lpCreateStruct)
 void CIWinSyncDlg::OnDestroy() 
 {
 	DeleteNotificationIcon();
-	CDialog::OnDestroy();
+	if (m_pszCurrentSyncPath != NULL)
+	{
+		free(m_pszCurrentSyncPath);
+	}
+	if (m_pszLogPath != NULL)
+	{
+		free(m_pszLogPath);
+	}
+	for(int i=0;i<5;i++)
+	{
+		if(m_apszLastResults[i] != NULL)
+		{
+			free(m_apszLastResults[i]);
+		}
+	}
 	
+	CDialog::OnDestroy();
+	if (m_pFlyoutDialog != NULL)
+	{
+		m_pFlyoutDialog->DestroyWindow();
+		m_pFlyoutDialog = NULL;
+	}
 }
 
 void CIWinSyncDlg::OnSysCommand(UINT nID, LPARAM lParam)
@@ -107,7 +149,6 @@ void CIWinSyncDlg::OnSysCommand(UINT nID, LPARAM lParam)
 
 void CIWinSyncDlg::OnTimer(UINT_PTR nIDEvent)
 {
-	// TODO: Add your message handler code here and/or call default
 	if (nIDEvent == HIDEFLYOUT_TIMER_ID)
         {
             // please see the comment in HideFlyout() for an explanation of this code.
@@ -286,6 +327,17 @@ void CIWinSyncDlg::OnTraymenuSyncCenter()
 	ShellExecute(NULL,_T("open"),szSyncCenterPath,NULL,NULL,SW_SHOW);
 }
 
+
+void CIWinSyncDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
+{
+	CDialogEx::OnActivate(nState, pWndOther, bMinimized);
+
+	if (nState == WA_ACTIVE || nState == WA_CLICKACTIVE)
+	{
+		PopulateSettingsDialog();
+	}
+}
+
 void CIWinSyncDlg::OnTraymenuAbout()  
 {
 	CAboutBox Aboutdlg;
@@ -356,305 +408,289 @@ afx_msg LRESULT CIWinSyncDlg::OnWmappHideflyout(WPARAM wParam, LPARAM lParam)
 	return 0;
 }
 
+void CIWinSyncDlg::SetupLogging()
+{
+	m_bLoggingEnabled = FALSE;
+
+	//Read The Current Log Path
+	ReadRegStringValue(_T("Software\\IWinSync"), _T("LogPath"),&m_pszLogPath);
+	if(m_pszLogPath !=NULL) 
+	{
+		_stprintf_s(m_pszConflictLogPath,MAX_PATH,_T("%s\\%s"),m_pszLogPath,CONFLICT_LOG_NAME);
+		_stprintf_s(m_pszAppLogPath,MAX_PATH,_T("%s\\%s"),m_pszLogPath,APP_LOG_NAME);
+	}
+	m_bLoggingEnabled = TRUE;
+}
+
+void CIWinSyncDlg::ReadRegistrySettings()
+{
+	m_pszCurrentSyncPath = NULL;
+	m_pszLogPath = NULL;
+
+	m_apszLastResults[0] = NULL;
+	m_apszLastResults[1] = NULL;
+	m_apszLastResults[2] = NULL;
+	m_apszLastResults[3] = NULL;
+	m_apszLastResults[4] = NULL;
+
+	//Read The current SyncPath
+	ReadRegStringValue(_T("Software\\IWinSync"), _T("CurSyncPath"),&m_pszCurrentSyncPath);
+	
+	//Read The Result Strings
+	ReadRegStringValue(_T("Software\\IWinSync"), _T("LastResult1"),&m_apszLastResults[0]);
+	ReadRegStringValue(_T("Software\\IWinSync"), _T("LastResult2"),&m_apszLastResults[1]);
+	ReadRegStringValue(_T("Software\\IWinSync"), _T("LastResult3"),&m_apszLastResults[2]);
+	ReadRegStringValue(_T("Software\\IWinSync"), _T("LastResult4"),&m_apszLastResults[3]);
+	ReadRegStringValue(_T("Software\\IWinSync"), _T("LastResult5"),&m_apszLastResults[4]);
+
+	//Read The Sync Interval
+	DWORD dwSyncInterval = ReadRegDWordValue(_T("Software\\IWinSync"), _T("SyncInterval"));
+	m_nSyncInterval = dwSyncInterval * 60000; //Convert from minutes to milliseconds
+	if (m_nSyncInterval < 10000) //If for some reason we calulate the interval to be less than 10 seconds then force ten seconds as the interval
+	{
+		m_nSyncInterval = DEFAULT_SYNC_INTERVAL
+	}
+
+	//Read The Current Log Level
+	m_dwLogLevel = ReadRegDWordValue(_T("Software\\IWinSync"), _T("LogLevel"));
+}
+
+void CIWinSyncDlg::PopulateSettingsDialog()
+{
+	//Set the Current Sync Path
+	CEdit* pPathEditBox = NULL;
+	pPathEditBox = (CEdit*) GetDlgItem(IDC_EDIT_PATH);
+	if (pPathEditBox != NULL)
+	{
+		pPathEditBox->SetWindowTextW(m_pszCurrentSyncPath);
+	}
+	pPathEditBox = NULL;
+
+	//Set the Current Sync Interval
+	CEdit* pIntervalEditBox = NULL;
+	pIntervalEditBox = (CEdit*) GetDlgItem(IDC_EDIT_INTERVAL);
+	if (pIntervalEditBox != NULL)
+	{
+		TCHAR szSyncInterval[50];
+		_stprintf_s(szSyncInterval,50,_T("%u"),(m_nSyncInterval/60000));
+		pIntervalEditBox->SetWindowTextW(szSyncInterval);
+	}
+	pIntervalEditBox = NULL;
 
 
+	//Set the Suppress Dialogs Check box
+	CButton* pEnableDialogsBtn = (CButton*) GetDlgItem(IDC_CHECK_SUPPRESS);
+	if (pEnableDialogsBtn != NULL)
+	{
+		pEnableDialogsBtn->SetCheck(m_bSuppressDialogs);
+	}
+	pEnableDialogsBtn = NULL;
+
+	//Set the Disable Sync Check box
+	CButton* pDisableSyncBtn = (CButton*) GetDlgItem(IDC_CHECK_DISABLE);
+	if (pDisableSyncBtn != NULL)
+	{
+		pDisableSyncBtn->SetCheck(m_bDisableSync);
+	}
+	pEnableDialogsBtn = NULL;
+
+	//Set The Last Result Strings
+	for (int i=0;i<5;i++)
+	{
+		CStatic *pResultText = NULL;
+		switch(i)
+		{
+		case 0:
+			pResultText = (CStatic*) GetDlgItem(IDC_RESULT1);
+			break;
+		case 1:
+			pResultText = (CStatic*) GetDlgItem(IDC_RESULT2);
+			break;
+		case 2:
+			pResultText = (CStatic*) GetDlgItem(IDC_RESULT3);
+			break;
+		case 3:
+			pResultText = (CStatic*) GetDlgItem(IDC_RESULT4);
+			break;
+		case 4:
+			pResultText = (CStatic*) GetDlgItem(IDC_RESULT5);
+			break;
+		}
+		if (pResultText != NULL)
+		{
+			if (m_apszLastResults[i] != NULL)
+			{
+				pResultText->SetWindowTextW(m_apszLastResults[i]);
+			}
+			else
+			{
+				pResultText->SetWindowTextW(_T(""));
+			}
+		}
+		pResultText = NULL;
+	}
+
+	//Select The Current Logging Level
+	CListBox * pLoggingLevelList = (CListBox*) GetDlgItem(IDC_LIST_LOGLEVEL);
+	if (pLoggingLevelList != NULL)
+	{
+		
+		if (m_dwLogLevel < 0 || m_dwLogLevel > 2)
+		{
+			m_dwLogLevel = DEFAULT_LOG_LEVEL;
+		}
+		pLoggingLevelList->SetCurSel(m_dwLogLevel);
+	}
+	pLoggingLevelList = NULL;
+	UpdateData(FALSE);
+}
+
+void CIWinSyncDlg::ReadRegStringValue(TCHAR *pszKey, TCHAR *pszName, TCHAR **ppszValue)
+{
+	HKEY hKey;
+	TCHAR szBuffer[1024];
+	DWORD dwDataBufSize = 1024;
+	DWORD dwKeyDataType;
+
+	*ppszValue = NULL;
+	if (RegOpenKeyEx(HKEY_CURRENT_USER, pszKey, 0, KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS)
+	{
+		//Opened the Path Key
+		if (RegQueryValueEx(hKey, pszName, NULL, &dwKeyDataType, (LPBYTE) &szBuffer, &dwDataBufSize) == ERROR_SUCCESS)
+		{
+			if (dwKeyDataType = REG_SZ)
+			{
+				*ppszValue = (TCHAR *)malloc(dwDataBufSize);
+				_stprintf_s(*ppszValue,(size_t)(dwDataBufSize/sizeof(TCHAR)),_T("%s"),szBuffer);
+			}
+		}
+		RegCloseKey(hKey);
+	}
+}
+
+DWORD CIWinSyncDlg::ReadRegDWordValue(TCHAR *pszKey, TCHAR *pszName)
+{
+	HKEY hKey;
+	DWORD dwValue = 0;
+	DWORD dwDataBufSize = 4;
+	DWORD dwKeyDataType;
+
+	if (RegOpenKeyEx(HKEY_CURRENT_USER, pszKey, 0, KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS)
+	{
+		//Opened the Path Key
+		if (RegQueryValueEx(hKey, pszName, NULL, &dwKeyDataType, (LPBYTE) &dwValue, &dwDataBufSize) != ERROR_SUCCESS)
+		{
+			dwValue=0;
+		}
+		RegCloseKey(hKey);
+	}
+	return dwValue;
+}
+
+void CIWinSyncDlg::WriteSettings()
+{
+	//Get the path to sync and save in registry
+	CEdit* pPathEditBox = NULL;
+	pPathEditBox = (CEdit*) GetDlgItem(IDC_EDIT_PATH);
+	if (pPathEditBox != NULL)
+	{
+		TCHAR szTempPath[MAX_PATH];
+		pPathEditBox->GetWindowTextW(szTempPath,MAX_PATH);
+		if(m_pszCurrentSyncPath != NULL)
+		{
+			free(m_pszCurrentSyncPath);
+			m_pszCurrentSyncPath = (TCHAR *) malloc((_tcslen(szTempPath)+1) *sizeof(TCHAR));
+		}
+		_tcscpy_s(m_pszCurrentSyncPath,(_tcslen(szTempPath)+1),szTempPath);
+	}
+	pPathEditBox = NULL;
+	WriteRegStringValue(_T("Software\\IWinSync"), _T("CurSyncPath"),m_pszCurrentSyncPath);
+
+	//get the sync interval
+	CEdit* pIntervalEditBox = NULL;
+	pIntervalEditBox = (CEdit*) GetDlgItem(IDC_EDIT_INTERVAL);
+	if (pIntervalEditBox != NULL)
+	{
+		TCHAR szSyncInterval[50];
+		pIntervalEditBox->GetWindowTextW(szSyncInterval,50);
+		DWORD dwScanInterval = 0;
+		_stscanf_s(szSyncInterval,_T("%u"),&dwScanInterval);
+		m_nSyncInterval = dwScanInterval * 60000;
+	}
+	pIntervalEditBox = NULL;
+	WriteRegDWordValue(_T("Software\\IWinSync"), _T("SyncInterval"),m_nSyncInterval/60000);
+
+	CListBox * pLoggingLevelList = (CListBox*) GetDlgItem(IDC_LIST_LOGLEVEL);
+	if (pLoggingLevelList != NULL)
+	{
+		m_dwLogLevel = pLoggingLevelList->GetCurSel();
+	}
+	pLoggingLevelList = NULL;
+
+	if (m_dwLogLevel < 0 || m_dwLogLevel > 2)
+	{
+		m_dwLogLevel = DEFAULT_LOG_LEVEL;
+	}
+	WriteRegDWordValue(_T("Software\\IWinSync"), _T("LogLevel"),m_dwLogLevel);
+}
+
+void CIWinSyncDlg::WriteRegStringValue(TCHAR *pszKey, TCHAR *pszName, TCHAR *pszValue)
+{
+	HKEY hKey;
+	DWORD dwDisposition;
+	if (RegCreateKeyEx(HKEY_CURRENT_USER, pszKey, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey,&dwDisposition) == ERROR_SUCCESS)
+	{
+		DWORD dwDataBufSize = 1024;
+		//We have either created or open the registry key
+		if (RegSetValueEx(hKey, pszName, 0, REG_SZ, (const BYTE *) pszValue, ((_tcslen(pszValue)+1) *sizeof(TCHAR))) != ERROR_SUCCESS)
+		{
+			//Log Error
+		}
+		RegCloseKey(hKey);
+	}
+}
+
+void CIWinSyncDlg::WriteRegDWordValue(TCHAR *pszKey, TCHAR *pszName, DWORD dwValue)
+{
+	HKEY hKey;
+	DWORD dwDisposition;
+	if (RegCreateKeyEx(HKEY_CURRENT_USER, pszKey, 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey,&dwDisposition) == ERROR_SUCCESS)
+	{
+		DWORD dwTemp = dwValue;
+		//We have either created or open the registry key
+		if (RegSetValueEx(hKey, pszName, 0, REG_DWORD, (const BYTE *) &dwTemp, sizeof(DWORD)) != ERROR_SUCCESS)
+		{
+			//Log Error
+		}
+		RegCloseKey(hKey);
+	}
+}
+
+void CIWinSyncDlg::OnBnClickedMinimise()
+{
+	WriteSettings();
+	PostMessage(WM_SYSCOMMAND, SC_MINIMIZE);
+}
 
 
+void CIWinSyncDlg::OnBnClickedReviewconflict()
+{
+	DWORD attr = GetFileAttributes(m_pszConflictLogPath);
+	if(attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
+	{
+		return;   // does not exist
+	}
+	ShellExecute(NULL,_T("open"),m_pszConflictLogPath,NULL,NULL,SW_SHOW);
+}
 
 
+void CIWinSyncDlg::OnBnClickedReviewlog()
+{
+	DWORD attr = GetFileAttributes(m_pszConflictLogPath);
+	if(attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
+	{
+		return;   // does not exist
+	}
+	ShellExecute(NULL,_T("open"),m_pszAppLogPath,NULL,NULL,SW_SHOW);
 
-
-
-
-
-
-
-
-
-//int CIWinSyncDlg::OnCreate(LPCREATESTRUCT lpCreateStruct) 
-//{
-//	if (CDialog::OnCreate(lpCreateStruct) == -1)
-//	{
-//		return -1;
-//	}
-//	m_nidIconData.hWnd = this->m_hWnd;
-//	m_nidIconData.uID = 1;
-//	
-//	return 0;
-//}
-//
-//void CIWinSyncDlg::OnDestroy() 
-//{
-//	CDialog::OnDestroy();
-//	if(m_nidIconData.hWnd && m_nidIconData.uID>0 && TrayIsVisible())
-//	{
-//		Shell_NotifyIcon(NIM_DELETE,&m_nidIconData);
-//	}
-//}
-
-//BOOL CIWinSyncDlg::TrayIsVisible()
-//{
-//	return m_bTrayIconVisible;
-//}
-//
-//void CIWinSyncDlg::TraySetIcon(HICON hIcon)
-//{
-//	ASSERT(hIcon);
-//
-//	m_nidIconData.hIcon = hIcon;
-//	m_nidIconData.uFlags |= NIF_ICON;
-//}
-//
-//void CIWinSyncDlg::TraySetIcon(UINT nResourceID)
-//{
-//	ASSERT(nResourceID>0);
-//	HICON hIcon = 0;
-//	hIcon = AfxGetApp()->LoadIcon(nResourceID);
-//	if(hIcon)
-//	{
-//		m_nidIconData.hIcon = hIcon;
-//		m_nidIconData.uFlags |= NIF_ICON;
-//	}
-//	else
-//	{
-//		TRACE0("FAILED TO LOAD ICON\n");
-//	}
-//}
-//
-//void CIWinSyncDlg::TraySetIcon(LPCTSTR lpszResourceName)
-//{
-//	HICON hIcon = 0;
-//	hIcon = AfxGetApp()->LoadIcon(lpszResourceName);
-//	if(hIcon)
-//	{
-//		m_nidIconData.hIcon = hIcon;
-//		m_nidIconData.uFlags |= NIF_ICON;
-//	}
-//	else
-//	{
-//		TRACE0("FAILED TO LOAD ICON\n");
-//	}
-//}
-//
-//void CIWinSyncDlg::TraySetToolTip(LPCTSTR lpszToolTip)
-//{
-//	ASSERT(_tcslen(lpszToolTip) > 0 && _tcslen(lpszToolTip) < 64);
-//
-//	_tcscpy_s(m_nidIconData.szTip,lpszToolTip);
-//	m_nidIconData.uFlags |= NIF_TIP;
-//}
-//
-//BOOL CIWinSyncDlg::TrayShow()
-//{
-//	BOOL bSuccess = FALSE;
-//	if(!m_bTrayIconVisible)
-//	{
-//		bSuccess = Shell_NotifyIcon(NIM_ADD,&m_nidIconData);
-//		if(bSuccess)
-//		{
-//			m_bTrayIconVisible= TRUE;
-//		}
-//		// Set the version
-//		//Shell_NotifyIcon(NIM_SETVERSION, &m_nidIconData);
-//	}
-//	else
-//	{
-//		TRACE0("ICON ALREADY VISIBLE");
-//	}
-//	return bSuccess;
-//}
-//
-//BOOL CIWinSyncDlg::TrayHide()
-//{
-//	BOOL bSuccess = FALSE;
-//	if(m_bTrayIconVisible)
-//	{
-//		bSuccess = Shell_NotifyIcon(NIM_DELETE,&m_nidIconData);
-//		if(bSuccess)
-//		{
-//			m_bTrayIconVisible= FALSE;
-//		}
-//	}
-//	else
-//	{
-//		TRACE0("ICON ALREADY HIDDEN");
-//	}
-//	return bSuccess;
-//}
-//
-//BOOL CIWinSyncDlg::TrayUpdate()
-//{
-//	BOOL bSuccess = FALSE;
-//	if(m_bTrayIconVisible)
-//	{
-//		bSuccess = Shell_NotifyIcon(NIM_MODIFY,&m_nidIconData);
-//	}
-//	else
-//	{
-//		TRACE0("ICON NOT VISIBLE");
-//	}
-//	return bSuccess;
-//}
-//
-//
-//BOOL CIWinSyncDlg::TraySetMenu(UINT nResourceID,UINT nDefaultPos)
-//{
-//	BOOL bSuccess;
-//	bSuccess = m_mnuTrayMenu.LoadMenu(nResourceID);
-//	return bSuccess;
-//}
-//
-//
-//BOOL CIWinSyncDlg::TraySetMenu(LPCTSTR lpszMenuName,UINT nDefaultPos)
-//{
-//	BOOL bSuccess;
-//	bSuccess = m_mnuTrayMenu.LoadMenu(lpszMenuName);
-//	return bSuccess;
-//}
-//
-//BOOL CIWinSyncDlg::TraySetMenu(HMENU hMenu,UINT nDefaultPos)
-//{
-//	m_mnuTrayMenu.Attach(hMenu);
-//	return TRUE;
-//}
-//
-//LRESULT CIWinSyncDlg::OnTrayNotify(WPARAM wParam, LPARAM lParam) 
-//{ 
-//    UINT uID; 
-//    UINT uMsg; 
-// 
-//    uID = (UINT) wParam; 
-//    uMsg = (UINT) lParam; 
-// 
-//	if (uID != 1)
-//	{
-//		return 0;
-//	}
-//
-//	CPoint pt;	
-//
-//    switch (uMsg ) 
-//	{ 
-//	case WM_MOUSEMOVE:
-//		GetCursorPos(&pt);
-//		ClientToScreen(&pt);
-//		OnTrayMouseMove(pt);
-//		break;
-//	case WM_LBUTTONDOWN:
-//		GetCursorPos(&pt);
-//		ClientToScreen(&pt);
-//		OnTrayLButtonDown(pt);
-//		break;
-//	case WM_LBUTTONDBLCLK:
-//		GetCursorPos(&pt);
-//		ClientToScreen(&pt);
-//		OnTrayLButtonDblClk(pt);
-//		break;
-//	
-//	case WM_RBUTTONDOWN:
-//	case WM_CONTEXTMENU:
-//		GetCursorPos(&pt);
-//		//ClientToScreen(&pt);
-//		OnTrayRButtonDown(pt);
-//		break;
-//	case WM_RBUTTONDBLCLK:
-//		GetCursorPos(&pt);
-//		ClientToScreen(&pt);
-//		OnTrayRButtonDblClk(pt);
-//		break;
-//    } 
-//     return 0; 
-// } 
-//void CIWinSyncDlg::OnSysCommand(UINT nID, LPARAM lParam)
-//{
-//	if(m_bMinimizeToTray)
-//	{
-//		if ((nID & 0xFFF0) == SC_MINIMIZE)
-//		{
-//		
-//			if( TrayShow())
-//			{
-//				this->ShowWindow(SW_HIDE);		
-//			}
-//		}
-//		else
-//			CDialog::OnSysCommand(nID, lParam);	
-//	}
-//	else
-//	{
-//		CDialog::OnSysCommand(nID, lParam);
-//	}
-//}
-//void CIWinSyncDlg::TraySetMinimizeToTray(BOOL bMinimizeToTray)
-//{
-//	m_bMinimizeToTray = bMinimizeToTray;
-//}
-//
-//
-//void CIWinSyncDlg::OnTrayRButtonDown(CPoint pt)
-//{
-//	m_mnuTrayMenu.GetSubMenu(0)->TrackPopupMenu(TPM_BOTTOMALIGN|TPM_LEFTBUTTON|TPM_RIGHTBUTTON,pt.x,pt.y,this);
-//	m_mnuTrayMenu.GetSubMenu(0)->SetDefaultItem(m_nDefaultMenuItem,TRUE);
-//}
-//
-//void CIWinSyncDlg::OnTrayLButtonDown(CPoint pt)
-//{
-//
-//}
-//
-//void CIWinSyncDlg::OnTrayLButtonDblClk(CPoint pt)
-//{
-//	if(m_bMinimizeToTray)
-//	{
-//		if(TrayHide())
-//		{
-//			this->ShowWindow(SW_SHOWNORMAL);
-//		}
-//	}
-//}
-//
-//void CIWinSyncDlg::OnTrayRButtonDblClk(CPoint pt)
-//{
-//}
-//
-//void CIWinSyncDlg::OnTrayMouseMove(CPoint pt)
-//{
-//}
-//
-//
-//void CIWinSyncDlg::OnTraymenuStatus() 
-//{
-//	if(m_bMinimizeToTray)
-//	{
-//		if(TrayHide())
-//		{
-//			this->ShowWindow(SW_SHOWNORMAL);
-//		}
-//	}
-//}
-//
-//void CIWinSyncDlg::OnTraymenuSyncCenter()  
-//{
-//	TCHAR szWindowsDirectory[MAX_PATH];
-//	if( !GetWindowsDirectory(szWindowsDirectory,MAX_PATH))
-//	{
-//		//Failed to get the windows directory so fail
-//		return;
-//	}
-//
-//	TCHAR szSyncCenterPath[MAX_PATH];
-//	_stprintf_s(szSyncCenterPath,_T("%s\\System32\\mobsync.exe"),szWindowsDirectory );
-//	ShellExecute(NULL,_T("open"),szSyncCenterPath,NULL,NULL,SW_SHOW);
-//}
-//
-//void CIWinSyncDlg::OnTraymenuAbout()  
-//{
-//	CAboutBox Aboutdlg;
-//	_stprintf_s(Aboutdlg.m_szVersion,_T("%s"),VERSIONTEXT );
-//	Aboutdlg.DoModal();
-//}
-//
-//void CIWinSyncDlg::OnTraymenuExit()  
-//{
-//	this->PostMessageW(WM_CLOSE,0,0);
-//}
+}
