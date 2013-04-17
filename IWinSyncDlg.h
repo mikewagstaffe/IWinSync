@@ -11,7 +11,6 @@
 UINT const WMAPP_NOTIFYCALLBACK = WM_APP + 1;
 UINT const WMAPP_HIDEFLYOUT     = WM_APP + 2;
 
-
 UINT_PTR const HIDEFLYOUT_TIMER_ID = 1;
 
 // CIWinSyncDlg dialog
@@ -100,4 +99,6 @@ public:
 
 	virtual void OnTrayMouseMove(CPoint pt);*/
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
+protected:
+	afx_msg LRESULT OnWmappHideflyout(WPARAM wParam, LPARAM lParam);
 };

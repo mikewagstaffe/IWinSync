@@ -40,6 +40,7 @@ BEGIN_MESSAGE_MAP(CIWinSyncDlg, CDialogEx)
 	ON_COMMAND(ID_TRAYMENU_ABOUT, OnTraymenuAbout)
 	ON_COMMAND(ID_TRAYMENU_EXIT, OnTraymenuExit)
 	ON_WM_TIMER()
+	ON_MESSAGE(WMAPP_HIDEFLYOUT, OnWmappHideflyout)
 END_MESSAGE_MAP()
 
 
@@ -329,6 +330,8 @@ void CIWinSyncDlg::ShowFlyout()
 		m_pFlyoutDialog = new CFlyoutDlg();
 		m_pFlyoutDialog->Create(IDD_FLYOUT, this);
 	}
+	
+	m_pFlyoutDialog->m_HideFlyoutMessage = WMAPP_HIDEFLYOUT;
 	PositionFlyout(__uuidof(CIWinSyncDlg));		
 	m_pFlyoutDialog->ShowWindow(SW_NORMAL);
 }
@@ -347,7 +350,11 @@ void CIWinSyncDlg::HideFlyout()
     SetTimer(HIDEFLYOUT_TIMER_ID, GetDoubleClickTime(), NULL);
 }
 
-
+afx_msg LRESULT CIWinSyncDlg::OnWmappHideflyout(WPARAM wParam, LPARAM lParam)
+{
+	HideFlyout();
+	return 0;
+}
 
 
 
@@ -651,5 +658,3 @@ void CIWinSyncDlg::HideFlyout()
 //{
 //	this->PostMessageW(WM_CLOSE,0,0);
 //}
-
-

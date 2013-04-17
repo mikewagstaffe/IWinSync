@@ -1,8 +1,6 @@
 #pragma once
 
-
 // CFlyoutDlg dialog
-UINT const WMAPP_HIDEFLYOUT     = WM_APP + 2;
 
 class CFlyoutDlg : public CDialogEx
 {
@@ -11,6 +9,7 @@ class CFlyoutDlg : public CDialogEx
 public:
 	CFlyoutDlg(CWnd* pParent = NULL);   // standard constructor
 	virtual ~CFlyoutDlg();
+	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
 
 // Dialog Data
 	enum { IDD = IDD_FLYOUT };
@@ -20,6 +19,7 @@ protected:
 	virtual BOOL OnInitDialog();
 
 	DECLARE_MESSAGE_MAP()
+
 public:
-	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
+	UINT m_HideFlyoutMessage;
 };
