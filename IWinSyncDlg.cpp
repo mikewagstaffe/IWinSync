@@ -121,6 +121,7 @@ void CIWinSyncDlg::OnDestroy()
 	if (m_pFlyoutDialog != NULL)
 	{
 		m_pFlyoutDialog->DestroyWindow();
+		delete(m_pFlyoutDialog);
 		m_pFlyoutDialog = NULL;
 	}
 	CDialog::OnDestroy();
@@ -390,6 +391,7 @@ void CIWinSyncDlg::HideFlyout()
 {
 	m_pFlyoutDialog->ShowWindow(SW_HIDE);
 	m_pFlyoutDialog->DestroyWindow();
+	delete(m_pFlyoutDialog);
 	m_pFlyoutDialog = NULL;
    
     // immediately after hiding the flyout we don't want to allow showing it again, which will allow clicking
