@@ -8,10 +8,10 @@
 #include "afxdialogex.h"
 #include "AboutBox.h"
 #include "resource.h"
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
-
 
 // CIWinSyncDlg dialog
 
@@ -79,6 +79,7 @@ BOOL CIWinSyncDlg::OnInitDialog()
 	m_bMinimizeToTray = FALSE;
 	m_bCanShowFlyout = TRUE;
 	PostMessage(WM_SYSCOMMAND, SC_MINIMIZE);
+	LOG(G2L_DEBUG) << "Application Is Started";
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -124,6 +125,7 @@ void CIWinSyncDlg::OnDestroy()
 		delete(m_pFlyoutDialog);
 		m_pFlyoutDialog = NULL;
 	}
+
 	CDialog::OnDestroy();
 	
 }
@@ -419,7 +421,17 @@ void CIWinSyncDlg::SetupLogging()
 		_stprintf_s(m_pszConflictLogPath,MAX_PATH,_T("%s\\%s"),m_pszLogPath,CONFLICT_LOG_NAME);
 		_stprintf_s(m_pszAppLogPath,MAX_PATH,_T("%s\\%s"),m_pszLogPath,APP_LOG_NAME);
 	}
-	m_bLoggingEnabled = TRUE;
+
+	m_dwLogLevel = ReadRegDWordValue(_T("Software\\IWinSync"), _T("LogLevel"));
+
+	int size_needed = WideCharToMultiByte(CP_UTF8, 0, m_pszLogPath, (int)_tcslen(m_pszLogPath), NULL, 0, NULL, NULL);
+    std::string strLogPath( size_needed, 0 );
+    WideCharToMultiByte(CP_UTF8, 0, m_pszLogPath, (int)_tcslen(m_pszLogPath), &strLogPath[0], size_needed, NULL, NULL);
+	
+	m_pLogger = new g2LogWorker(APP_LOG_NAME, strLogPath);
+	g_iLoggingLevel = m_dwLogLevel;
+	g2::initializeLogging(m_pLogger);
+	m_bLoggingEnabled = TRUE; 
 }
 
 void CIWinSyncDlg::ReadRegistrySettings()
@@ -449,7 +461,7 @@ void CIWinSyncDlg::ReadRegistrySettings()
 		m_nSyncInterval = DEFAULT_SYNC_INTERVAL
 	}
 
-	//Read The Current Log Level
+		//Read The Current Log Level
 	m_dwLogLevel = ReadRegDWordValue(_T("Software\\IWinSync"), _T("LogLevel"));
 }
 

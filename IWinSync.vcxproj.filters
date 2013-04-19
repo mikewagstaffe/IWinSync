@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\g2log">
+      <UniqueIdentifier>{a179fe4a-ce12-49b2-9c72-8c4506cf6e0a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\g2log">
+      <UniqueIdentifier>{39981ad6-19cb-4723-8269-9fe2eb97db14}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -39,6 +45,27 @@
     <ClInclude Include="FlyoutDlg.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="active.h">
+      <Filter>Header Files\g2log</Filter>
+    </ClInclude>
+    <ClInclude Include="crashhandler.h">
+      <Filter>Header Files\g2log</Filter>
+    </ClInclude>
+    <ClInclude Include="g2future.h">
+      <Filter>Header Files\g2log</Filter>
+    </ClInclude>
+    <ClInclude Include="g2log.h">
+      <Filter>Header Files\g2log</Filter>
+    </ClInclude>
+    <ClInclude Include="g2logworker.h">
+      <Filter>Header Files\g2log</Filter>
+    </ClInclude>
+    <ClInclude Include="g2time.h">
+      <Filter>Header Files\g2log</Filter>
+    </ClInclude>
+    <ClInclude Include="shared_queue.h">
+      <Filter>Header Files\g2log</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="IWinSync.cpp">
@@ -55,6 +82,21 @@
     </ClCompile>
     <ClCompile Include="FlyoutDlg.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="active.cpp">
+      <Filter>Source Files\g2log</Filter>
+    </ClCompile>
+    <ClCompile Include="crashhandler.cpp">
+      <Filter>Source Files\g2log</Filter>
+    </ClCompile>
+    <ClCompile Include="g2log.cpp">
+      <Filter>Source Files\g2log</Filter>
+    </ClCompile>
+    <ClCompile Include="g2logworker.cpp">
+      <Filter>Source Files\g2log</Filter>
+    </ClCompile>
+    <ClCompile Include="g2time.cpp">
+      <Filter>Source Files\g2log</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

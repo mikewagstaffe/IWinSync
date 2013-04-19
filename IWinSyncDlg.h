@@ -4,19 +4,20 @@
 
 #pragma once
 
-
 #define VERSIONTEXT _T("1.0.2")
 #define DEFAULT_SYNC_INTERVAL 1;
 #define DEFAULT_LOG_LEVEL 0;
 
 #define LOGLEVEL_LISTBOX_DEBUG _T("DEBUG")
-#define LOGLEVEL_LISTBOX_WARN _T("WARNINGS")
-#define LOGLEVEL_LISTBOX_ERROR _T("ERRORS")
+#define LOGLEVEL_LISTBOX_WARN _T("INFO")
+#define LOGLEVEL_LISTBOX_ERROR _T("WARNINGS")
 
 #define CONFLICT_LOG_NAME   _T("IWinSync_Conflicts.log")
-#define APP_LOG_NAME  _T("IWinSyncApp.log")
+#define APP_LOG_NAME  "IWinSyncApp"
 
 #include "FlyoutDlg.h"
+#include "g2logworker.h"
+#include "g2log.h"
 
 UINT const WMAPP_NOTIFYCALLBACK = WM_APP + 1;
 UINT const WMAPP_HIDEFLYOUT     = WM_APP + 2;
@@ -94,7 +95,7 @@ private:
 	TCHAR m_pszAppLogPath[MAX_PATH];
 	UINT m_nSyncInterval;
 	DWORD m_dwLogLevel;
-
+	g2LogWorker *m_pLogger;
 	TCHAR *m_apszLastResults[5];
 
 public:
