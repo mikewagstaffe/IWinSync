@@ -19,6 +19,12 @@
     <Filter Include="Source Files\g2log">
       <UniqueIdentifier>{39981ad6-19cb-4723-8269-9fe2eb97db14}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\OfflineFilesSyncClient">
+      <UniqueIdentifier>{e77c0a44-9b43-43d3-9e2e-c1131d7469ab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\OfflineFilesSyncClient">
+      <UniqueIdentifier>{947d69c3-956b-4cca-bcc1-f631974fce11}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -66,6 +72,21 @@
     <ClInclude Include="shared_queue.h">
       <Filter>Header Files\g2log</Filter>
     </ClInclude>
+    <ClInclude Include="OfflineFilesClient.h">
+      <Filter>Header Files\OfflineFilesSyncClient</Filter>
+    </ClInclude>
+    <ClInclude Include="OfflineFilesEvents.h">
+      <Filter>Header Files\OfflineFilesSyncClient</Filter>
+    </ClInclude>
+    <ClInclude Include="SyncConflictHandler.h">
+      <Filter>Header Files\OfflineFilesSyncClient</Filter>
+    </ClInclude>
+    <ClInclude Include="SyncProgressHandler.h">
+      <Filter>Header Files\OfflineFilesSyncClient</Filter>
+    </ClInclude>
+    <ClInclude Include="ConflictResult.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="IWinSync.cpp">
@@ -97,6 +118,21 @@
     </ClCompile>
     <ClCompile Include="g2time.cpp">
       <Filter>Source Files\g2log</Filter>
+    </ClCompile>
+    <ClCompile Include="OfflineFilesClient.cpp">
+      <Filter>Source Files\OfflineFilesSyncClient</Filter>
+    </ClCompile>
+    <ClCompile Include="OfflineFilesEvents.cpp">
+      <Filter>Source Files\OfflineFilesSyncClient</Filter>
+    </ClCompile>
+    <ClCompile Include="SyncConflictHandler.cpp">
+      <Filter>Source Files\OfflineFilesSyncClient</Filter>
+    </ClCompile>
+    <ClCompile Include="SyncProgressHandler.cpp">
+      <Filter>Source Files\OfflineFilesSyncClient</Filter>
+    </ClCompile>
+    <ClCompile Include="ConflictResult.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

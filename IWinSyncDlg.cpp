@@ -6,7 +6,6 @@
 #include "IWinSync.h"
 #include "IWinSyncDlg.h"
 #include "afxdialogex.h"
-#include "AboutBox.h"
 #include "resource.h"
 
 #ifdef _DEBUG
@@ -51,7 +50,7 @@ END_MESSAGE_MAP()
 BOOL CIWinSyncDlg::OnInitDialog()
 {
 	CDialogEx::OnInitDialog();
-
+	
 	// Set the icon for this dialog.  The framework does this automatically
 	//  when the application's main window is not a dialog
 	SetIcon(m_hIcon, TRUE);			// Set big icon
@@ -78,8 +77,22 @@ BOOL CIWinSyncDlg::OnInitDialog()
 	ShowWindow(SW_SHOWMINIMIZED);
 	m_bMinimizeToTray = FALSE;
 	m_bCanShowFlyout = TRUE;
+
+
+	LOG(G2L_DEBUG) << "Application Is Started - Starting OfflineFiles Service";
+	if ( !InitSyncClient() ) //Need to pass event details
+	{
+		PostQuitMessage(0); // Shutdown because the application did not initialise
+	}
+	//start The sync Timer
+	m_puSyncTimer = SetTimer(SYNC_TIMER_ID, m_nSyncInterval, NULL);
+	if(  m_puSyncTimer == 0)
+	{
+		LOG(G2L_WARNING) << "Failed To start the sync Timer";
+		PostQuitMessage(0); // Shutdown because the application did not initialise
+	}
+	LOG(G2L_DEBUG) << "Application Is Started - Started OfflineFiles Service";
 	PostMessage(WM_SYSCOMMAND, SC_MINIMIZE);
-	LOG(G2L_DEBUG) << "Application Is Started";
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -103,6 +116,17 @@ int CIWinSyncDlg::OnCreate(LPCREATESTRUCT lpCreateStruct)
 
 void CIWinSyncDlg::OnDestroy() 
 {
+	KillTimer(m_puSyncTimer); // Kill The Synchronisation timer
+	m_puSyncTimer = NULL;
+
+	//Shut down the synchronisation system
+	if (m_pOfflineFilesClient != NULL)
+	{
+		m_pOfflineFilesClient->Cleanup();
+		free(m_pOfflineFilesClient);
+		m_pOfflineFilesClient = NULL;
+	}
+
 	DeleteNotificationIcon();
 	if (m_pszCurrentSyncPath != NULL)
 	{
@@ -150,11 +174,22 @@ void CIWinSyncDlg::OnSysCommand(UINT nID, LPARAM lParam)
 
 void CIWinSyncDlg::OnTimer(UINT_PTR nIDEvent)
 {
+	switch(nIDEvent)
+	{
+	case HIDEFLYOUT_TIMER_ID:
+		// please see the comment in HideFlyout() for an explanation of this code.
+        KillTimer(HIDEFLYOUT_TIMER_ID);
+        m_bCanShowFlyout = TRUE;
+		break;
+	case SYNC_TIMER_ID:
+		KillTimer(m_puSyncTimer);
+		//Start the Synchronisation thread
+		AfxBeginThread(SyncThreadProc,(LPVOID)m_pOfflineFilesClient);
+		break;
+	}
 	if (nIDEvent == HIDEFLYOUT_TIMER_ID)
-        {
-            // please see the comment in HideFlyout() for an explanation of this code.
-            KillTimer(HIDEFLYOUT_TIMER_ID);
-            m_bCanShowFlyout = TRUE;
+	{
+            
         }
 	CDialogEx::OnTimer(nIDEvent);
 }
@@ -230,7 +265,7 @@ BOOL CIWinSyncDlg::ShowConflictBalloon()
 
 BOOL CIWinSyncDlg::ShowErrorBalloon()
 {
-    // Display an out of ink balloon message. This is a error, so show the appropriate system icon.
+    // Display an Error balloon message. This is a error, so show the appropriate system icon.
     NOTIFYICONDATA nid = {sizeof(nid)};
     nid.uFlags = NIF_INFO | NIF_GUID;
     nid.guidItem = __uuidof(CIWinSyncDlg);
@@ -703,4 +738,89 @@ void CIWinSyncDlg::OnBnClickedReviewlog()
 	}
 	ShellExecute(NULL,_T("open"),m_pszAppLogPath,NULL,NULL,SW_SHOW);
 
+}
+
+BOOL CIWinSyncDlg::InitSyncClient()
+{
+	bool bInitComplete = FALSE;
+	m_pOfflineFilesClient = new COfflineFilesClient(WMAPP_SYNCCOMPLETE,WMAPP_SYNCCONFLICT,this->m_hWnd);
+	if(m_pOfflineFilesClient == NULL)
+	{
+		LOG(G2L_WARNING) << "m_pOfflineFilesClient = new COfflineFilesClient() Returned NULL";
+		MessageBox(_T("Failed To Setup Offline Files Client"),_T("OfflineFiles Error"), MB_ICONERROR | MB_OK);
+	}
+
+	if ( !m_pOfflineFilesClient->Init())
+	{
+		LOG(G2L_WARNING) << "m_pOfflineFilesClient->Init() Returned False";
+		MessageBox(_T("Failed To Setup Offline Files Client"),_T("OfflineFiles Error"), MB_ICONERROR | MB_OK);
+	}
+
+	OFFLINEFILESCLIENT_INIT_STATE initState = m_pOfflineFilesClient->GetInitialiseState();
+	if (initState == OFFLINEFILESCLIENT_INIT_STATE_RESTART_PENDING)
+	{
+		LOG(G2L_INFO) << "m_pOfflineFilesClient->GetInitialiseState() returned OFFLINEFILESCLIENT_INIT_STATE_RESTART_PENDING";
+		MessageBox(_T("Your PC Must be restarted to start Offline files Service"),_T("OfflineFiles"), MB_ICONINFORMATION | MB_OK);
+	}
+	else if (initState == OFFLINEFILESCLIENT_INIT_STATE_STARTED)
+	{
+		LOG(G2L_DEBUG) << "m_pOfflineFilesClient->GetInitialiseState() returned OFFLINEFILESCLIENT_INIT_STATE_STARTED";
+
+		if (m_pszCurrentSyncPath != NULL)
+		{
+			size_t SyncPathLen = _tcslen(m_pszCurrentSyncPath);
+			LPCWSTR pCurrentSyncPath = (LPCWSTR) malloc((SyncPathLen +1) * sizeof(wchar_t));
+			if (pCurrentSyncPath != NULL)
+			{
+				#ifdef UNICODE
+				// The username is defined as unicode /so we can jjust copy the bytes
+				memcpy((void *)pCurrentSyncPath,m_pszCurrentSyncPath,((SyncPathLen +1) * sizeof(wchar_t)));
+				#else
+				//The username is defined as standard
+				MultiByteToWideChar(CP_UTF8, 0,m_pszCurrentSyncPath,-1,pCurrentSyncPath,((SyncPathLen +1));
+				#endif
+
+				if(!m_pOfflineFilesClient->InitCache(&pCurrentSyncPath))
+				{
+					LOG(G2L_WARNING) << "m_pOfflineFilesClient->InitCache Returned False, with path: " << m_pszCurrentSyncPath;
+					MessageBox(_T("Failed To Initialise Offline Files Cache"),_T("OfflineFiles Error"), MB_ICONERROR | MB_OK);
+				}
+				else
+				{
+					LOG(G2L_DEBUG) << "Offline Files Cache Was Initiated, with path:" << m_pszCurrentSyncPath;
+					//OfflineFilesClient.RegisterSyncEvents(); //Do not need events
+					bInitComplete = TRUE;
+				}
+				free((void*)pCurrentSyncPath);
+				pCurrentSyncPath = NULL;
+			}
+			else
+			{
+				LOG(G2L_WARNING) << "pCurrentSyncPath is NULL ";
+				MessageBox(_T("Failed To Initialise Offline Files Cache"),_T("OfflineFiles Error"), MB_ICONERROR | MB_OK);
+			}
+		}
+		else
+		{
+			LOG(G2L_WARNING) << "m_pszCurrentSyncPath is NULL ";
+			MessageBox(_T("Failed To Initialise Offline Files Cache"),_T("OfflineFiles Error"), MB_ICONERROR | MB_OK);
+		}
+	}
+	else
+	{
+		LOG(G2L_WARNING) << "m_pOfflineFilesClient->GetInitialiseState Returned an invalid state: " << initState;
+		MessageBox(_T("Failed To start The Offline Files Service"),_T("OfflineFiles Error"), MB_ICONERROR | MB_OK);
+	}
+
+	LOG_IF(G2L_DEBUG,bInitComplete) << "Offline Files Initialisation Completed";
+	LOG_IF(G2L_DEBUG,!bInitComplete) << "Offline Files Initialisation Failed";
+	return bInitComplete;
+}
+
+UINT CIWinSyncDlg::SyncThreadProc( LPVOID pParam )
+{
+	COfflineFilesClient* pOfflineFilesClient = (COfflineFilesClient*)pParam;
+	pOfflineFilesClient->Synchronise();
+	pOfflineFilesClient = NULL;
+	return 0;
 }

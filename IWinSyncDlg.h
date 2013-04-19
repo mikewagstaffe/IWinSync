@@ -4,6 +4,12 @@
 
 #pragma once
 
+#include "FlyoutDlg.h"
+#include "AboutBox.h"
+#include "g2logworker.h"
+#include "g2log.h"
+#include "OfflineFilesClient.h"
+
 #define VERSIONTEXT _T("1.0.2")
 #define DEFAULT_SYNC_INTERVAL 1;
 #define DEFAULT_LOG_LEVEL 0;
@@ -15,14 +21,15 @@
 #define CONFLICT_LOG_NAME   _T("IWinSync_Conflicts.log")
 #define APP_LOG_NAME  "IWinSyncApp"
 
-#include "FlyoutDlg.h"
-#include "g2logworker.h"
-#include "g2log.h"
 
 UINT const WMAPP_NOTIFYCALLBACK = WM_APP + 1;
 UINT const WMAPP_HIDEFLYOUT     = WM_APP + 2;
+UINT const WMAPP_SYNCCONFLICT   = WM_APP + 3; //Raised on detection of a sync conflict
+UINT const WMAPP_SYNCCOMPLETE   = WM_APP + 4; //Raised on completeion of a sync operation
+
 
 UINT_PTR const HIDEFLYOUT_TIMER_ID = 1;
+UINT_PTR const SYNC_TIMER_ID = 2;
 
 // CIWinSyncDlg dialog
 
@@ -36,11 +43,12 @@ public:
 // Dialog Data
 	enum { IDD = IDD_IWINSYNC_DIALOG };
 
-	protected:
-	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
-
 // Implementation
 protected:
+
+	//Afx Message Functions
+	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV support
+	virtual BOOL OnInitDialog();
 
 	// Generated message map functions
 	afx_msg void OnPaint();
@@ -56,9 +64,11 @@ protected:
 	afx_msg void OnTimer(UINT_PTR nIDEvent);
 	afx_msg LRESULT OnWmappHideflyout(WPARAM wParam, LPARAM lParam);
 	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
-	virtual BOOL OnInitDialog();
-
-
+	afx_msg void OnBnClickedMinimise();
+	afx_msg void OnBnClickedReviewconflict();
+	afx_msg void OnBnClickedReviewlog();
+	
+	//Appplication functions
 	BOOL AddNotificationIcon(HWND hwnd);
 	BOOL DeleteNotificationIcon();
 	void ShowContextMenu(HWND hwnd, POINT pt);
@@ -80,6 +90,10 @@ protected:
 	DECLARE_MESSAGE_MAP()
 
 private:
+	BOOL InitSyncClient();
+	static UINT SyncThreadProc( LPVOID pParam );
+
+private:
 	HICON m_hIcon;
 	HINSTANCE g_hInst;
 	CFlyoutDlg *m_pFlyoutDialog;
@@ -97,9 +111,6 @@ private:
 	DWORD m_dwLogLevel;
 	g2LogWorker *m_pLogger;
 	TCHAR *m_apszLastResults[5];
-
-public:
-	afx_msg void OnBnClickedMinimise();
-	afx_msg void OnBnClickedReviewconflict();
-	afx_msg void OnBnClickedReviewlog();
+	UINT_PTR m_puSyncTimer;
+	COfflineFilesClient	*m_pOfflineFilesClient;
 };
