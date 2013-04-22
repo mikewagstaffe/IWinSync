@@ -85,7 +85,7 @@
       <Filter>Header Files\OfflineFilesSyncClient</Filter>
     </ClInclude>
     <ClInclude Include="ConflictResult.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\OfflineFilesSyncClient</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -132,7 +132,7 @@
       <Filter>Source Files\OfflineFilesSyncClient</Filter>
     </ClCompile>
     <ClCompile Include="ConflictResult.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\OfflineFilesSyncClient</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

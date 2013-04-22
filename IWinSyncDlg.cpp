@@ -32,6 +32,8 @@ BEGIN_MESSAGE_MAP(CIWinSyncDlg, CDialogEx)
 	ON_WM_DESTROY() //On destroy Of the Dialog
 	ON_WM_ACTIVATE()
 	ON_MESSAGE(WMAPP_NOTIFYCALLBACK,OnTrayNotify)
+	ON_MESSAGE(WMAPP_SYNCCONFLICT, OnSyncConflict)
+	ON_MESSAGE(WMAPP_SYNCCOMPLETE,OnSyncComplete)
 	ON_WM_SYSCOMMAND() //Hook The Minimize request
 	ON_COMMAND(ID_TRAYMENU_STATUS, OnTraymenuStatus)
 	ON_COMMAND(ID_TRAYMENU_SYNCCENTRE, OnTraymenuSyncCenter)
@@ -296,7 +298,6 @@ BOOL CIWinSyncDlg::RestoreTooltip()
     nid.guidItem = __uuidof(CIWinSyncDlg);
     return Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
-
 LRESULT CIWinSyncDlg::OnTrayNotify(WPARAM wParam, LPARAM lParam) 
 {
 	 switch (LOWORD(lParam))
@@ -815,6 +816,17 @@ BOOL CIWinSyncDlg::InitSyncClient()
 	LOG_IF(G2L_DEBUG,bInitComplete) << "Offline Files Initialisation Completed";
 	LOG_IF(G2L_DEBUG,!bInitComplete) << "Offline Files Initialisation Failed";
 	return bInitComplete;
+}
+
+LRESULT CIWinSyncDlg::OnSyncConflict(WPARAM wParam, LPARAM lParam)
+{
+	return 0;
+}
+
+LRESULT CIWinSyncDlg::OnSyncComplete(WPARAM wParam, LPARAM lParam)
+{
+	ShowStatusBalloon();
+	return 0;
 }
 
 UINT CIWinSyncDlg::SyncThreadProc( LPVOID pParam )

@@ -27,7 +27,7 @@ COfflineFilesClient::COfflineFilesClient(UINT const uWMSyncComplete, UINT const 
 	//Save the main application signaling data
 	 m_uWMSyncComplete = uWMSyncComplete;
 	 m_uWMSyncConflict = uWMSyncConflict;
-	 m_hwndApplication = hwndApplication;
+	 m_hwndApplication = hwndApplication; 
 }
 
 
@@ -423,14 +423,14 @@ void COfflineFilesClient::Cleanup(void)
 	CoUninitialize();
 }
 
-BOOL COfflineFilesClient::Synchronise(void)
+BOOL COfflineFilesClient::Synchronise()
 {
 	LOG(G2L_DEBUG) << "sync called";
-	if (m_pOfflineFilesCache != NULL)
+	if (m_pOfflineFilesCache == NULL)
 	{
 		LOG(G2L_WARNING) << "Synchronise Called whilst m_pOfflineFilesCache == NULL";
 		// The Cache Has Not been initialised
-		PostMessage(m_hwndApplication,m_uWMSyncComplete,NULL,1);
+		SendMessage(m_hwndApplication,m_uWMSyncComplete,1,NULL);
 		return (FALSE);
 	}
 	CSyncConflictHandler *pOfflineFilesConflictHandler = new CSyncConflictHandler(m_uWMSyncConflict,m_hwndApplication);
@@ -445,7 +445,7 @@ BOOL COfflineFilesClient::Synchronise(void)
 		//If we did not get the user name then set it to user
 		_tcscpy_s(pOfflineFilesConflictHandler->m_szUsername,TEXT("USER"));
 	}
-	
+	LOG(G2L_DEBUG) << "starting sync";
 	HRESULT hrResult = m_pOfflineFilesCache->Synchronize( NULL,		//No Window Handle
 								&m_pszCachePath,					//The path of our folder
 								1,									//1 folder in the list
@@ -504,7 +504,7 @@ BOOL COfflineFilesClient::Synchronise(void)
 			}
 		}		
 	}
-	PostMessage(m_hwndApplication,m_uWMSyncComplete,NULL,1);
+	SendMessage(m_hwndApplication,m_uWMSyncComplete,0,hrResult);
 	return true;
 }
 	

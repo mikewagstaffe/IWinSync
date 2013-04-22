@@ -9,6 +9,7 @@
 #include "g2logworker.h"
 #include "g2log.h"
 #include "OfflineFilesClient.h"
+#include "ConflictResult.h"
 
 #define VERSIONTEXT _T("1.0.2")
 #define DEFAULT_SYNC_INTERVAL 1;
@@ -54,6 +55,8 @@ protected:
 	afx_msg void OnPaint();
 	afx_msg HCURSOR OnQueryDragIcon();
 	afx_msg LRESULT OnTrayNotify(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnSyncConflict(WPARAM wParam, LPARAM lParam);
+	afx_msg LRESULT OnSyncComplete(WPARAM wParam, LPARAM lParam);
 	afx_msg int OnCreate(LPCREATESTRUCT lpCreateStruct);
 	afx_msg void OnDestroy();
 	afx_msg void OnSysCommand(UINT nID, LPARAM lParam);	

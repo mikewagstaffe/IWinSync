@@ -14,6 +14,7 @@ enum OFFLINEFILESCLIENT_INIT_STATE
 #include "OfflineFilesEvents.h"
 #include "SyncConflictHandler.h"
 #include "SyncProgressHandler.h"
+#include "ConflictResult.h"
 #include "g2log.h"
 
 class COfflineFilesClient
@@ -66,6 +67,5 @@ private:
 	IUnknown *m_pSinkUnk;
 	DWORD m_dwAdvise;
 	COfflineFilesEvents *m_pOfflineFilesEvents;
-
 };
 

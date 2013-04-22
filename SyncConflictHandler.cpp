@@ -246,14 +246,24 @@ HRESULT STDMETHODCALLTYPE CSyncConflictHandler::ResolveConflict(LPCWSTR pszPath,
 			{
 				if(CopyFile(pszPath,pszFilePostFix,FALSE) != 0)
 				{
+					//Copy File succeded so we have resolved the conflict
+
+					// This is the code to return the path to allow Offlice Files to resolve the conflict but it does not always work
+					// pszTempPath contains a valid path copy it to the return paramter
+					//size_t PathSize =  (wcslen (pszNewFile) + 1) * sizeof(wchar_t);
+					//*ppszNewName = (LPWSTR) CoTaskMemAlloc(PathSize);
+					//memcpy(*ppszNewName,pszNewFile,PathSize);
+					
+					*pConflictResolution = OFFLINEFILES_SYNC_CONFLICT_RESOLVE_KEEPREMOTE;
+					
 					pConflictResult = new CConflictResult(CONFLICT_RESOLUTION_RESOLVED,&pszPath,(LPCWSTR *)&pszFilePostFix);
 				}
+				else
+				{
+					//Copy failed we have not resolvved the conflict
+					*pConflictResolution = OFFLINEFILES_SYNC_CONFLICT_RESOLVE_LOG;
+				}
 
-				// pszTempPath contains a valid path copy it to the return paramter
-				//size_t PathSize =  (wcslen (pszNewFile) + 1) * sizeof(wchar_t);
-				//*ppszNewName = (LPWSTR) CoTaskMemAlloc(PathSize);
-				//memcpy(*ppszNewName,pszNewFile,PathSize);
-				*pConflictResolution =OFFLINEFILES_SYNC_CONFLICT_RESOLVE_KEEPREMOTE;
 			}
 			else
 			{
@@ -286,6 +296,24 @@ HRESULT STDMETHODCALLTYPE CSyncConflictHandler::ResolveConflict(LPCWSTR pszPath,
 		}
 		pszUsername = NULL;
 	}
+
+
+	if (*pConflictResolution != OFFLINEFILES_SYNC_CONFLICT_RESOLVE_KEEPREMOTE || pConflictResult == NULL )
+	{
+		//A conflict occured and was not resolved by copying the the file
+		if (*pConflictResolution == OFFLINEFILES_SYNC_CONFLICT_RESOLVE_LOG)
+		{
+			//A Conflict could not be resolved and was logged
+			pConflictResult = new CConflictResult(CONFLICT_RESOLUTION_NOT_RESOLVED,&pszPath,NULL);
+		}
+		else
+		{
+			//A Conflict Occured and was automatically resolved
+			pConflictResult = new CConflictResult(CONFLICT_RESOLUTION_POLICY_RESOLVED,&pszPath,NULL);
+		}
+	}
+	//Send the message to the main application
+	SendMessage(m_hwndApplication,m_uWMSyncConflict,0,(LPARAM)pConflictResult);
 	return S_OK;
 }
 

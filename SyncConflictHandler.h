@@ -1,5 +1,6 @@
 #pragma once
 #include "cscobj.h"
+#include "ConflictResult.h"
 
 
 class CSyncConflictHandler :
@@ -26,6 +27,5 @@ private:
 	ULONG m_cRef;
 	UINT m_uWMSyncConflict;	//The Windows Message ID to signal a sync conflict
 	HWND m_hwndApplication;	//The handle of the main application window
-
 };
 
