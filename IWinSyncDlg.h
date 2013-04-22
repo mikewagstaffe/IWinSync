@@ -3,6 +3,8 @@
 //
 
 #pragma once
+#include <fstream>
+#include <iostream>
 
 #include "FlyoutDlg.h"
 #include "AboutBox.h"
@@ -77,7 +79,7 @@ protected:
 	void ShowContextMenu(HWND hwnd, POINT pt);
 	BOOL ShowConflictBalloon();
 	BOOL ShowErrorBalloon();
-	BOOL ShowStatusBalloon();
+	BOOL ShowStatusBalloon(UINT uID);
 	BOOL RestoreTooltip();
 	void ShowFlyout();
 	void HideFlyout();
@@ -87,6 +89,7 @@ protected:
 	DWORD ReadRegDWordValue(TCHAR *pszKey, TCHAR *pszName);
 	void WriteRegStringValue(TCHAR *pszKey, TCHAR *pszName, TCHAR *pszValue);
 	void WriteRegDWordValue(TCHAR *pszKey, TCHAR *pszName, DWORD dwValue);
+	void LogSyncResultReg(BOOL bError, BOOL bConflicts, HRESULT hr);
 	void WriteSettings();
 	void PopulateSettingsDialog();
 	void SetupLogging();
@@ -95,7 +98,10 @@ protected:
 private:
 	BOOL InitSyncClient();
 	static UINT SyncThreadProc( LPVOID pParam );
+	static UINT ConflictLogThreadProc( LPVOID pParam );
 
+public:
+	TCHAR m_pszConflictLogPath[MAX_PATH];
 private:
 	HICON m_hIcon;
 	HINSTANCE g_hInst;
@@ -108,7 +114,6 @@ private:
 	BOOL m_bLoggingEnabled;
 	TCHAR *m_pszCurrentSyncPath;
 	TCHAR *m_pszLogPath;
-	TCHAR m_pszConflictLogPath[MAX_PATH];
 	TCHAR m_pszAppLogPath[MAX_PATH];
 	UINT m_nSyncInterval;
 	DWORD m_dwLogLevel;
@@ -116,4 +121,6 @@ private:
 	TCHAR *m_apszLastResults[5];
 	UINT_PTR m_puSyncTimer;
 	COfflineFilesClient	*m_pOfflineFilesClient;
+	BOOL m_bSyncInProgress;
+	BOOL m_bConflictOccured;
 };

@@ -186,6 +186,8 @@ void CIWinSyncDlg::OnTimer(UINT_PTR nIDEvent)
 	case SYNC_TIMER_ID:
 		KillTimer(m_puSyncTimer);
 		//Start the Synchronisation thread
+		m_bSyncInProgress = TRUE;
+		m_bConflictOccured = FALSE;
 		AfxBeginThread(SyncThreadProc,(LPVOID)m_pOfflineFilesClient);
 		break;
 	}
@@ -277,15 +279,15 @@ BOOL CIWinSyncDlg::ShowErrorBalloon()
     return Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
-BOOL CIWinSyncDlg::ShowStatusBalloon()
+BOOL CIWinSyncDlg::ShowStatusBalloon(UINT uID)
 {
-    // Display a balloon message for a print job with a custom icon
+    // Display a balloon message for a sync job with a custom icon
     NOTIFYICONDATA nid = {sizeof(nid)};
     nid.uFlags = NIF_INFO | NIF_GUID;
     nid.guidItem = __uuidof(CIWinSyncDlg);
     nid.dwInfoFlags = NIIF_USER | NIIF_LARGE_ICON;
-    LoadString(g_hInst, IDS_STATUS_TITLE, nid.szInfoTitle, ARRAYSIZE(nid.szInfoTitle));
-    LoadString(g_hInst, IDS_STATUS_TEXT, nid.szInfo, ARRAYSIZE(nid.szInfo));
+	LoadString(g_hInst, IDS_STATUS_TITLE, nid.szInfoTitle, ARRAYSIZE(nid.szInfoTitle));
+    LoadString(g_hInst, uID, nid.szInfo, ARRAYSIZE(nid.szInfo));
     LoadIconMetric(g_hInst, MAKEINTRESOURCE(IDR_MAINFRAME), LIM_LARGE, &nid.hBalloonIcon);
     return Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
@@ -319,7 +321,7 @@ LRESULT CIWinSyncDlg::OnTrayNotify(WPARAM wParam, LPARAM lParam)
 		}
 		else
 		{
-			ShowFlyout();
+			ShowFlyout(); 
 		}
 		break;
 
@@ -414,6 +416,8 @@ void CIWinSyncDlg::PositionFlyout(REFGUID guidIcon)
 
 void CIWinSyncDlg::ShowFlyout()
 {
+	//Dont Want a flyout so just return
+	return;
 	if (m_pFlyoutDialog == NULL)
 	{
 		m_pFlyoutDialog = new CFlyoutDlg();
@@ -633,6 +637,77 @@ DWORD CIWinSyncDlg::ReadRegDWordValue(TCHAR *pszKey, TCHAR *pszName)
 	return dwValue;
 }
 
+void CIWinSyncDlg::LogSyncResultReg(BOOL bError, BOOL bConflicts, HRESULT hr)
+{
+	DWORD dwLastLine = ReadRegDWordValue(_T("Software\\IWinSync"), _T("LastLine"));
+	if (dwLastLine < 0 || dwLastLine > 4)
+	{
+		//We do not have a valid line so start again
+		dwLastLine = 0;
+	}
+	TCHAR szResult[100];
+	TCHAR szErrorString[256];
+	
+	if(!bError && !bConflicts)
+	{
+		_stprintf_s(szResult,_T(" Without Error (Result %d)"),hr);
+	}
+	else if (bError && bConflicts)
+	{
+		_stprintf_s(szResult,_T(" With Errors and Conflicts (Result %d)"),hr);
+	}
+	else if (bError)
+	{
+		_stprintf_s(szResult,_T(" With Errors (Result %d)"),hr);
+	}
+	else if (bConflicts)
+	{
+		_stprintf_s(szResult,_T(" With Conflicts (Result %d)"),hr);
+	}
+	else
+	{
+		_stprintf_s(szResult,_T(" With Unknown Result (Result %d)"),hr);
+	}
+
+
+	SYSTEMTIME st;
+    GetSystemTime(&st);
+
+	_stprintf_s(szErrorString,_T("%2d:%2d:%2d On %2d/%2d/%d - Synchronisation Completed%s"),	st.wHour,
+																								st.wMinute,
+																								st.wSecond,
+																								st.wDay,
+																								st.wMonth,
+																								st.wYear,
+																								szResult);
+
+	switch(dwLastLine)
+	{
+		case 0:
+			WriteRegStringValue(_T("Software\\IWinSync"), _T("LastResult1"),szErrorString);
+			break;
+		case 1:
+			WriteRegStringValue(_T("Software\\IWinSync"), _T("LastResult2"),szErrorString);
+			break;
+		case 2:
+			WriteRegStringValue(_T("Software\\IWinSync"), _T("LastResult3"),szErrorString);
+			break;
+		case 3:
+			WriteRegStringValue(_T("Software\\IWinSync"), _T("LastResult4"),szErrorString);
+			break;
+		case 4:
+			WriteRegStringValue(_T("Software\\IWinSync"), _T("LastResult5"),szErrorString);
+			break;
+	}
+	
+	if (++dwLastLine > 4)
+	{
+		dwLastLine = 0;
+	}
+	WriteRegDWordValue(_T("Software\\IWinSync"), _T("LastLine"),dwLastLine);
+}
+
+
 void CIWinSyncDlg::WriteSettings()
 {
 	//Get the path to sync and save in registry
@@ -820,12 +895,79 @@ BOOL CIWinSyncDlg::InitSyncClient()
 
 LRESULT CIWinSyncDlg::OnSyncConflict(WPARAM wParam, LPARAM lParam)
 {
+	if (m_bSyncInProgress)
+	{
+		m_bConflictOccured = TRUE;
+	}
+	//Thread handling bit here
+	//check if thread is running wait for thread to finish
+	//start new thread to log.
+	//Log the confilct
 	return 0;
 }
 
 LRESULT CIWinSyncDlg::OnSyncComplete(WPARAM wParam, LPARAM lParam)
 {
-	ShowStatusBalloon();
+	m_bSyncInProgress = FALSE;
+	BOOL bLogError = FALSE;
+	//If wparam is 0 then the sync completed else show an error
+	if (wParam != 0)
+	{
+		bLogError = TRUE;
+		if (m_bSuppressDialogs)
+		{
+			ShowErrorBalloon();
+		}
+		else
+		{
+			MessageBox(_T("Failed to run synchronisation. Check the log for details."),_T("Synchronisation Error"), MB_ICONERROR | MB_OK);
+			//show a message box
+		}
+		return 0;
+	}
+	
+	if (lParam == S_OK && !m_bConflictOccured)
+	{
+		ShowStatusBalloon(IDS_COMPLETE_MESSAGE);
+	}
+	else
+	{
+		if (m_bConflictOccured)
+		{
+			if (m_bSuppressDialogs)
+			{
+				ShowStatusBalloon(IDS_COMPLETE_CONFLICT);
+			}
+			else
+			{
+				MessageBox(_T("Synchronisation completed, but conflicts were detected.\r\nFiles may have been modified. Check the log for details."),_T("Synchronisation Conflicts"), MB_ICONINFORMATION | MB_OK);
+			}
+		}
+		else
+		{
+			bLogError = TRUE;
+			if (m_bSuppressDialogs)
+			{
+				ShowStatusBalloon(IDS_COMPLETE_ERRORS);				
+			}
+			else
+			{
+				MessageBox(_T("Synchronisation completed, but errors were detected.\r\nFiles may have been modified. and further synchronisation request may fail.\n\rCheck the log for details."),_T("Synchronisation Error"), MB_ICONERROR | MB_OK);
+			}
+		}
+	}
+	//Log The result of the last sync
+	LogSyncResultReg(bLogError,m_bConflictOccured, (HRESULT) lParam);
+	
+	//Restart the timer
+	m_puSyncTimer = SetTimer(SYNC_TIMER_ID, m_nSyncInterval, NULL);
+	if(  m_puSyncTimer == 0)
+	{
+		LOG(G2L_WARNING) << "Failed To start the sync Timer";
+		MessageBox(_T("Failed To Restart Synchronisation Timer.\n\rCheck the log for details."),_T("Synchronisation Error"), MB_ICONERROR | MB_OK);
+		PostQuitMessage(0); // Shutdown because the application did not initialise
+	}
+
 	return 0;
 }
 
@@ -835,4 +977,60 @@ UINT CIWinSyncDlg::SyncThreadProc( LPVOID pParam )
 	pOfflineFilesClient->Synchronise();
 	pOfflineFilesClient = NULL;
 	return 0;
-}
+} 
+
+UINT CIWinSyncDlg::ConflictLogThreadProc( LPVOID pParam )
+{
+	CIWinSyncDlg *instance =   (CIWinSyncDlg *) pParam;
+	//Check The Size Of the File
+	
+	BOOL bFileTooBig = FALSE;
+	HANDLE hFile = CreateFile(instance->m_pszConflictLogPath, // file to open
+                       GENERIC_READ,          // open for reading
+                       FILE_SHARE_READ,       // share for reading
+                       NULL,                  // default security
+                       OPEN_EXISTING,         // existing file only
+                       FILE_ATTRIBUTE_NORMAL, // normal file
+                       NULL);                 // no attr. template
+	if (hFile != INVALID_HANDLE_VALUE) 
+    { 
+		LARGE_INTEGER lFileSize;
+		GetFileSizeEx(hFile,&lFileSize);
+		if (lFileSize.LowPart > 0x4C4B40) //file is bigger than ~5 MB
+		{
+			bFileTooBig = TRUE;		
+		}
+		CloseHandle(hFile);
+	}
+
+	if (bFileTooBig)
+	{
+		TCHAR szLogFileCopy[MAX_PATH];
+		TCHAR *pExtension = _tcsrchr(instance->m_pszConflictLogPath,_T('.'));
+		if (pExtension != NULL)
+		{
+			int iLength  = pExtension - instance->m_pszConflictLogPath + 1;
+			_tcsncpy_s(szLogFileCopy, instance->m_pszConflictLogPath, iLength);
+			_tcscat_s(szLogFileCopy,_T(".log2"));
+			if(CopyFile(instance->m_pszConflictLogPath,szLogFileCopy,FALSE) != 0)
+			{
+				//now delete our file
+				DeleteFile(instance->m_pszConflictLogPath);
+			}
+		}
+	}
+	//At this point if the file was too big it is copied to another file and deleted if not just log
+	
+
+	CStdioFile ConflictLogFile;
+	if( !ConflictLogFile.Open( instance->m_pszConflictLogPath, CFile::modeCreate| CFile::modeWrite | CFile::typeText ) ) 
+	{
+		LOG(G2L_WARNING) << "Failed Open Conflict Log File";
+	}
+	TCHAR szLogMessage[1024];
+
+	ConflictLogFile.WriteString(szLogMessage);
+	ConflictLogFile.Flush();
+	ConflictLogFile.Close();
+	return 0;
+} 
