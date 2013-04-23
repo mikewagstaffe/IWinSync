@@ -385,6 +385,7 @@ LRESULT CIWinSyncDlg::OnTrayNotify(WPARAM wParam, LPARAM lParam)
 void CIWinSyncDlg::OnTraymenuStatus() 
 {
 	ReadRegistrySettings();
+	PopulateSettingsDialog();
 	if(m_bMinimizeToTray)
 	{
 		this->ShowWindow(SW_SHOWNORMAL);
