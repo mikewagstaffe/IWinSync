@@ -20,6 +20,7 @@ CIWinSyncDlg::CIWinSyncDlg(CWnd* pParent /*=NULL*/) : CDialogEx(CIWinSyncDlg::ID
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	g_hInst = AfxGetInstanceHandle();
 	m_pConflictLogThread = NULL;
+	m_bSyncPathSet = FALSE;
 }
 
 void CIWinSyncDlg::DoDataExchange(CDataExchange* pDX)
@@ -77,25 +78,41 @@ BOOL CIWinSyncDlg::OnInitDialog()
 	m_bDisableSync = FALSE;
 	PopulateSettingsDialog();
 	
-	ShowWindow(SW_SHOWMINIMIZED);
+	if (m_bSyncPathSet)
+	{
+		ShowWindow(SW_SHOWMINIMIZED);
+	}
+	else
+	{
+		ShowWindow(SW_SHOWNORMAL);
+	}
+	
 	m_bMinimizeToTray = FALSE;
 	m_bCanShowFlyout = TRUE;
 
-
-	LOG(G2L_DEBUG) << "Application Is Started - Starting OfflineFiles Service";
-	if ( !InitSyncClient() ) //Need to pass event details
+	if ( m_bSyncPathSet)
 	{
-		PostQuitMessage(0); // Shutdown because the application did not initialise
+		LOG(G2L_DEBUG) << "Application Is Started - Starting OfflineFiles Service";
+		if ( !InitSyncClient() ) //Need to pass event details
+		{
+			PostQuitMessage(0); // Shutdown because the application did not initialise
+			return TRUE;
+		}
+		//start The sync Timer
+		m_puSyncTimer = SetTimer(SYNC_TIMER_ID, m_nSyncInterval, NULL);
+		if(  m_puSyncTimer == 0)
+		{
+			LOG(G2L_WARNING) << "Failed To start the sync Timer";
+			PostQuitMessage(0); // Shutdown because the application did not initialise
+			return TRUE;
+		}
+		LOG(G2L_DEBUG) << "Application Is Started - Started OfflineFiles Service";
+		PostMessage(WM_SYSCOMMAND, SC_MINIMIZE);
 	}
-	//start The sync Timer
-	m_puSyncTimer = SetTimer(SYNC_TIMER_ID, m_nSyncInterval, NULL);
-	if(  m_puSyncTimer == 0)
+	else
 	{
-		LOG(G2L_WARNING) << "Failed To start the sync Timer";
-		PostQuitMessage(0); // Shutdown because the application did not initialise
+		LOG(G2L_DEBUG) << "Application Is Started - Sync Folder Is Not set";
 	}
-	LOG(G2L_DEBUG) << "Application Is Started - Started OfflineFiles Service";
-	PostMessage(WM_SYSCOMMAND, SC_MINIMIZE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -112,15 +129,21 @@ int CIWinSyncDlg::OnCreate(LPCREATESTRUCT lpCreateStruct)
 	{
 		return -1;
 	}
-
-	AddNotificationIcon(this->m_hWnd);
+	if( !AddNotificationIcon(this->m_hWnd))
+	{
+		MessageBox(_T("Failed Creating System Tray Icon."),_T("IWinSync Fatal Error"),MB_ICONERROR | MB_OK);
+		return -1;
+	}
 	return 0;
 }
 
 void CIWinSyncDlg::OnDestroy() 
 {
-	KillTimer(m_puSyncTimer); // Kill The Synchronisation timer
-	m_puSyncTimer = NULL;
+	if (m_puSyncTimer != NULL)
+	{
+		KillTimer(m_puSyncTimer); // Kill The Synchronisation timer
+		m_puSyncTimer = NULL;
+	}
 
 	//Shut down the synchronisation system
 	if (m_pOfflineFilesClient != NULL)
@@ -220,12 +243,14 @@ BOOL CIWinSyncDlg::AddNotificationIcon(HWND hwnd)
     // add the icon, setting the icon, tooltip, and callback message.
     // the icon will be identified with the GUID
     nid.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE | NIF_SHOWTIP | NIF_GUID;
-    nid.guidItem = __uuidof(CIWinSyncDlg);
+    nid.uTimeout = 5000;
+	nid.guidItem = __uuidof(CIWinSyncDlg);
     nid.uCallbackMessage = WMAPP_NOTIFYCALLBACK;
-    LoadIconMetric(g_hInst, MAKEINTRESOURCE(IDR_MAINFRAME), LIM_SMALL, &nid.hIcon);
+   LoadIconMetric(g_hInst, MAKEINTRESOURCE(IDR_MAINFRAME), LIM_SMALL, &nid.hIcon);
     LoadString(g_hInst, IDS_TOOLTIP, nid.szTip, ARRAYSIZE(nid.szTip));
+	
     Shell_NotifyIcon(NIM_ADD, &nid);
-
+	
     // NOTIFYICON_VERSION_4 is prefered
     nid.uVersion = NOTIFYICON_VERSION_4;
     return Shell_NotifyIcon(NIM_SETVERSION, &nid);
@@ -346,7 +371,7 @@ LRESULT CIWinSyncDlg::OnTrayNotify(WPARAM wParam, LPARAM lParam)
         case NIN_BALLOONUSERCLICK:
             RestoreTooltip();
             // placeholder for the user clicking on the balloon.
-            MessageBox(L"The user clicked on the balloon.", L"User click", MB_OK);
+            //MessageBox(L"The user clicked on the balloon.", L"User click", MB_OK);
 			break;
 
         case WM_CONTEXTMENU:
@@ -359,6 +384,7 @@ LRESULT CIWinSyncDlg::OnTrayNotify(WPARAM wParam, LPARAM lParam)
 
 void CIWinSyncDlg::OnTraymenuStatus() 
 {
+	ReadRegistrySettings();
 	if(m_bMinimizeToTray)
 	{
 		this->ShowWindow(SW_SHOWNORMAL);
@@ -473,7 +499,7 @@ void CIWinSyncDlg::SetupLogging()
 	if(m_pszLogPath !=NULL) 
 	{
 		_stprintf_s(m_pszConflictLogPath,MAX_PATH,_T("%s\\%s"),m_pszLogPath,CONFLICT_LOG_NAME);
-		_stprintf_s(m_pszAppLogPath,MAX_PATH,_T("%s\\%s"),m_pszLogPath,APP_LOG_NAME);
+		_stprintf_s(m_pszAppLogPath,MAX_PATH,_T("%s"),m_pszLogPath);
 	}
 
 	m_dwLogLevel = ReadRegDWordValue(_T("Software\\IWinSync"), _T("LogLevel"));
@@ -517,6 +543,11 @@ void CIWinSyncDlg::ReadRegistrySettings()
 
 		//Read The Current Log Level
 	m_dwLogLevel = ReadRegDWordValue(_T("Software\\IWinSync"), _T("LogLevel"));
+	if(_tcslen(m_pszCurrentSyncPath) > 0)
+	{
+		//there is a sync path set
+		m_bSyncPathSet = TRUE;
+	}
 }
 
 void CIWinSyncDlg::PopulateSettingsDialog()
@@ -804,7 +835,15 @@ void CIWinSyncDlg::WriteRegDWordValue(TCHAR *pszKey, TCHAR *pszName, DWORD dwVal
 void CIWinSyncDlg::OnBnClickedMinimise()
 {
 	WriteSettings();
-	PostMessage(WM_SYSCOMMAND, SC_MINIMIZE);
+	if(!m_bSyncPathSet && _tcslen(m_pszCurrentSyncPath) > 0)
+	{
+		MessageBox(_T("To begin synchronisation, IWinSync needs to be restarted."),_T("IWinSync Restart Required"), MB_ICONINFORMATION | MB_OK);
+		PostQuitMessage(0); // Shutdown to allow the application to be restarted
+	}
+	else
+	{
+		PostMessage(WM_SYSCOMMAND, SC_MINIMIZE);
+	}
 }
 
 
@@ -821,13 +860,37 @@ void CIWinSyncDlg::OnBnClickedReviewconflict()
 
 void CIWinSyncDlg::OnBnClickedReviewlog()
 {
-	DWORD attr = GetFileAttributes(m_pszConflictLogPath);
+	if (m_pLogger == NULL)
+	{
+		return;
+	}
+	
+	#ifdef UNICODE
+		std::wstring stemp = s2ws(m_pLogger->szlogFileName()); // Temporary buffer is required
+		LPCWSTR result = stemp.c_str();
+	#else
+		LPCWSTR result = s.c_str();
+	#endif
+	DWORD attr = GetFileAttributes(result);
 	if(attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
 	{
 		return;   // does not exist
 	}
-	ShellExecute(NULL,_T("open"),m_pszAppLogPath,NULL,NULL,SW_SHOW);
+	ShellExecute(NULL,_T("open"),result,NULL,NULL,SW_SHOW);
 
+}
+
+
+std::wstring CIWinSyncDlg::s2ws(const std::string& s)
+{
+ int len;
+ int slength = (int)s.length() + 1;
+ len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0); 
+ wchar_t* buf = new wchar_t[len];
+ MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, buf, len);
+ std::wstring r(buf);
+ delete[] buf;
+ return r;
 }
 
 BOOL CIWinSyncDlg::InitSyncClient()
@@ -966,11 +1029,13 @@ LRESULT CIWinSyncDlg::OnSyncComplete(WPARAM wParam, LPARAM lParam)
 		return 0;
 	}
 	
-	if (lParam == S_OK && !m_bConflictOccured)
-	{
-		ShowStatusBalloon(IDS_COMPLETE_MESSAGE);
-	}
-	else
+	//Dont Show the dialog on succesfull completion
+	//if (lParam == S_OK && !m_bConflictOccured)
+	//{
+	//	ShowStatusBalloon(IDS_COMPLETE_MESSAGE);
+	//}
+	
+	if (lParam != S_OK || m_bConflictOccured)
 	{
 		if (m_bConflictOccured)
 		{
@@ -992,7 +1057,7 @@ LRESULT CIWinSyncDlg::OnSyncComplete(WPARAM wParam, LPARAM lParam)
 			}
 			else
 			{
-				MessageBox(_T("Synchronisation completed, but errors were detected.\r\nFiles may have been modified. and further synchronisation request may fail.\n\rCheck the log for details."),_T("Synchronisation Error"), MB_ICONERROR | MB_OK);
+				MessageBox(_T("Synchronisation completed, but errors were detected.\r\nFiles may have been modified and further synchronisation request may fail.\n\rCheck the log for details."),_T("Synchronisation Error"), MB_ICONERROR | MB_OK);
 			}
 		}
 	}

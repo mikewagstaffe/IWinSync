@@ -35,8 +35,14 @@ UINT_PTR const HIDEFLYOUT_TIMER_ID = 1;
 UINT_PTR const SYNC_TIMER_ID = 2;
 
 // CIWinSyncDlg dialog
+#ifdef _DEBUG
+class __declspec(uuid("{22D6D602-CFC7-495C-87A9-9C3CE3394141}")) //Debug GUID
+#else
+class __declspec(uuid("{20C6D433-7A01-4E1A-92F0-23AB9EC4A2A6}")) //Release GUID
+#endif
 
-class __declspec(uuid("{22D6D602-CFC7-495C-87A9-9C3CE3394141}")) 
+
+
 CIWinSyncDlg : public CDialogEx
 {
 // Construction
@@ -93,6 +99,7 @@ protected:
 	void WriteSettings();
 	void PopulateSettingsDialog();
 	void SetupLogging();
+	std::wstring s2ws(const std::string& s);
 	DECLARE_MESSAGE_MAP()
 
 private:
@@ -110,7 +117,7 @@ private:
 	CFlyoutDlg *m_pFlyoutDialog;
 	BOOL m_bMinimizeToTray;
 	BOOL m_bCanShowFlyout;	
-
+	BOOL m_bSyncPathSet;
 	BOOL m_bSuppressDialogs;
 	BOOL m_bDisableSync;
 	BOOL m_bLoggingEnabled;

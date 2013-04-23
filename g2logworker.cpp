@@ -133,7 +133,6 @@ struct g2LogWorkerImpl
   void backgroundExitFatal(g2::internal::FatalMessage fatal_message);
   std::string  backgroundChangeLogFile(const std::string& directory);
   std::string  backgroundFileName();
-
   std::string log_file_with_path_;
   std::string log_prefix_backup_; // needed in case of future log file changes of directory
   std::unique_ptr<kjellkod::Active> bg_;
@@ -143,6 +142,8 @@ private:
   g2LogWorkerImpl& operator=(const g2LogWorkerImpl&); // c++11 feature not yet in vs2010 = delete;
   g2LogWorkerImpl(const g2LogWorkerImpl& other); // c++11 feature not yet in vs2010 = delete;
   std::ofstream& filestream(){return *(outptr_.get());}
+public:
+
 };
 
 
@@ -294,3 +295,8 @@ std::future<std::string> g2LogWorker::logFileName()
   auto future_result = g2::spawn_task(bg_call ,bgWorker);
   return std::move(future_result);
 }
+std::string g2LogWorker::szlogFileName()
+{
+	return pimpl_->backgroundFileName();
+}
+

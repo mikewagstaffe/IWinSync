@@ -49,11 +49,11 @@ public:
 
   void setLogLevel(int nLogLevel);
  
+  std::string g2LogWorker::szlogFileName();
 
 private:
   std::unique_ptr<g2LogWorkerImpl> pimpl_;
   const std::string log_file_with_path_;
-
   //Added By M.Wagstaffe - To Filter Logging
    int m_CurrentLogLevel;			//The Current Level Of Logging Required
 
