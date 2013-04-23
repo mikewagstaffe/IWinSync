@@ -19,6 +19,7 @@ CIWinSyncDlg::CIWinSyncDlg(CWnd* pParent /*=NULL*/) : CDialogEx(CIWinSyncDlg::ID
 	//End Of Tray Icon Init Code
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	g_hInst = AfxGetInstanceHandle();
+	m_pConflictLogThread = NULL;
 }
 
 void CIWinSyncDlg::DoDataExchange(CDataExchange* pDX)
@@ -186,9 +187,22 @@ void CIWinSyncDlg::OnTimer(UINT_PTR nIDEvent)
 	case SYNC_TIMER_ID:
 		KillTimer(m_puSyncTimer);
 		//Start the Synchronisation thread
-		m_bSyncInProgress = TRUE;
-		m_bConflictOccured = FALSE;
-		AfxBeginThread(SyncThreadProc,(LPVOID)m_pOfflineFilesClient);
+		if (!m_bDisableSync)
+		{
+			m_bSyncInProgress = TRUE;
+			m_bConflictOccured = FALSE;
+			AfxBeginThread(SyncThreadProc,(LPVOID)m_pOfflineFilesClient);
+		}
+		else
+		{
+			m_puSyncTimer = SetTimer(SYNC_TIMER_ID, m_nSyncInterval, NULL);
+			if(  m_puSyncTimer == 0)
+			{
+				LOG(G2L_WARNING) << "Failed To start the sync Timer";
+				MessageBox(_T("Failed To Restart Synchronisation Timer.\n\rCheck the log for details."),_T("Synchronisation Error"), MB_ICONERROR | MB_OK);
+				PostQuitMessage(0); // Shutdown because the application did not initialise
+			}
+		}
 		break;
 	}
 	if (nIDEvent == HIDEFLYOUT_TIMER_ID)
@@ -899,10 +913,36 @@ LRESULT CIWinSyncDlg::OnSyncConflict(WPARAM wParam, LPARAM lParam)
 	{
 		m_bConflictOccured = TRUE;
 	}
-	//Thread handling bit here
-	//check if thread is running wait for thread to finish
-	//start new thread to log.
-	//Log the confilct
+	//Build the Conflict Message
+	
+	
+	CConflictResult *pConflictResult = (CConflictResult *) lParam;
+	if (pConflictResult->m_uResolution ==  CONFLICT_RESOLUTION_POLICY_RESOLVED)
+	{
+		_stprintf_s(m_szLogMessage,_T("Conflict Resolved By Policy For File: %s "),pConflictResult->m_pszConflictedFile);	
+	}
+	else if (pConflictResult->m_uResolution == CONFLICT_RESOLUTION_RESOLVED)
+	{
+		_stprintf_s(m_szLogMessage,_T("Conflict Resolved By Policy For File: %s Renamed To: %s"),pConflictResult->m_pszConflictedFile, pConflictResult->m_pszNewFile);	
+	}
+	else //not resolved
+	{
+		_stprintf_s(m_szLogMessage,_T("Conflict Not Resolved For File (See Sync Centre): %s "),pConflictResult->m_pszConflictedFile);	
+	}
+	delete(pConflictResult);
+
+	//If the thread is not null then it is already running
+	if (m_pConflictLogThread != NULL)
+	{
+		//Wait for the thread to finish
+		if(WaitForSingleObject(m_pConflictLogThread->m_hThread, 60000)==WAIT_TIMEOUT) //wait 1 minute if not then log the error in our normal log
+		{
+			//The thread did not terminate in time
+			LOG(G2L_WARNING) << "";
+		}
+	}
+	m_pConflictLogThread = AfxBeginThread(ConflictLogThreadProc,(LPVOID)this);
+	
 	return 0;
 }
 
@@ -1027,7 +1067,19 @@ UINT CIWinSyncDlg::ConflictLogThreadProc( LPVOID pParam )
 	{
 		LOG(G2L_WARNING) << "Failed Open Conflict Log File";
 	}
-	TCHAR szLogMessage[1024];
+	TCHAR szLogMessage[(MAX_PATH*2)+512];
+	SYSTEMTIME st;
+    GetSystemTime(&st);
+
+	_stprintf_s(szLogMessage,_T("%2d:%2d:%2d On %2d/%2d/%d -%s"),	st.wHour,
+																	st.wMinute,
+																	st.wSecond,
+																	st.wDay,
+																	st.wMonth,
+																	st.wYear,
+																	instance->m_szLogMessage);
+
+	//Log The message Here
 
 	ConflictLogFile.WriteString(szLogMessage);
 	ConflictLogFile.Flush();

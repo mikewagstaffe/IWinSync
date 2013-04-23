@@ -19,7 +19,7 @@ public:
 	void NewFileFile(LPCWSTR *ppszNewFile);
 	CONFLICT_RESOLUTION ConflictResolved();
 
-private:
+public:
 	CONFLICT_RESOLUTION m_uResolution;
 	LPCWSTR m_pszConflictedFile;
 	LPCWSTR m_pszNewFile;

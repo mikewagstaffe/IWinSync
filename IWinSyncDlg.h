@@ -102,6 +102,8 @@ private:
 
 public:
 	TCHAR m_pszConflictLogPath[MAX_PATH];
+	TCHAR m_szLogMessage[(MAX_PATH*2) +256];
+
 private:
 	HICON m_hIcon;
 	HINSTANCE g_hInst;
@@ -123,4 +125,7 @@ private:
 	COfflineFilesClient	*m_pOfflineFilesClient;
 	BOOL m_bSyncInProgress;
 	BOOL m_bConflictOccured;
+
+	CWinThread *m_pConflictLogThread;
+	
 };
